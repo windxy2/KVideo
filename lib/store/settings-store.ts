@@ -3,7 +3,7 @@
  */
 
 import type { VideoSource, SourceSubscription } from '@/lib/types';
-import { DEFAULT_SOURCES } from '@/lib/api/default-sources';
+import { DEFAULT_SOURCES, DEFAULT_SUBSCRIPTIONS } from '@/lib/api/default-sources';
 import { PREMIUM_SOURCES } from '@/lib/api/premium-sources';
 import { createSubscription } from '@/lib/utils/source-import-utils';
 
@@ -100,7 +100,7 @@ function getDefaultAppSettings(): AppSettings {
   return {
     sources: getDefaultSources(),
     premiumSources: getDefaultPremiumSources(),
-    subscriptions: getEnvSubscriptions(),
+    subscriptions: [...DEFAULT_SUBSCRIPTIONS, ...getEnvSubscriptions()],
     sortBy: 'default',
     searchHistory: true,
     watchHistory: true,
@@ -139,18 +139,25 @@ export const settingsStore = {
 
     try {
       const parsed = JSON.parse(stored);
-      // Get ENV subscriptions
+      // Get default and ENV subscriptions
       const envSubscriptions = getEnvSubscriptions();
+      const defaultSubscriptions = DEFAULT_SUBSCRIPTIONS;
 
       // Parse stored subscriptions
       const storedSubscriptions = Array.isArray(parsed.subscriptions) ? parsed.subscriptions : [];
 
-      // Merge: ENV subscriptions take precedence for existence, but we want to keep local state (like lastUpdated) if possible
-      // However, for simplicity and ensuring "auto update" as user requested, if it's in ENV, we act as if it's a fresh/enforced source
-      // actually, let's just merge them by URL.
-
+      // Merge: ENV subscriptions and Default subscriptions
       const mergedSubscriptions = [...storedSubscriptions];
 
+      // Add default subscriptions if they don't exist
+      defaultSubscriptions.forEach(defSub => {
+        const existingIndex = mergedSubscriptions.findIndex(s => s.url === defSub.url);
+        if (existingIndex === -1) {
+          mergedSubscriptions.push(defSub);
+        }
+      });
+
+      // Add/Update ENV subscriptions
       envSubscriptions.forEach(envSub => {
         const existingIndex = mergedSubscriptions.findIndex(s => s.url === envSub.url);
         if (existingIndex > -1) {
